@@ -15,12 +15,12 @@ from timeit import default_timer as timer
 
 sys.path.insert(0, 'package')
 with warnings.catch_warnings():
-    warnings.filterwarnings("ignore",category=DeprecationWarning)
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
     from prettytable import PrettyTable
     import autogluon as ag
     from autogluon import TabularPrediction as task
     from autogluon.task.tabular_prediction import TabularDataset
-    
+
 
 # ------------------------------------------------------------ #
 # Training methods                                             #
@@ -43,60 +43,61 @@ def __load_input_data(path: str) -> TabularDataset:
     except:
         print(f'No csv data in {path}!')
         return None
+    
+def format_for_print(df):
+    table = PrettyTable(list(df.columns))
+    for row in df.itertuples():
+        table.add_row(row[1:])
+    return str(table)
 
 def train(args):
-
     is_distributed = len(args.hosts) > 1
-    host_rank = args.hosts.index(args.current_host)    
+    host_rank = args.hosts.index(args.current_host)
     dist_ip_addrs = args.hosts
     dist_ip_addrs.pop(host_rank)
-    ngpus_per_trial = 1 if args.num_gpus > 0 else 0
 
-    # load training and validation data
+    # Load training and validation data
     print(f'Train files: {os.listdir(args.train)}')
     train_data = __load_input_data(args.train)
-    print(f'Label counts: {dict(Counter(train_data[args.label]))}')
-    print(f'hp: {args.hyperparameters}')
     
+    # Extract column info
+    target = args.fit_args['label']
+    columns = train_data.columns.tolist()
+    column_dict = {"columns":columns}
+    with open('columns.pkl', 'wb') as f:
+        pickle.dump(column_dict, f)
+    
+    # Train models
     predictor = task.fit(
         train_data=train_data,
-        label=args.label,            
         output_directory=args.model_dir,
-        problem_type=args.problem_type,
-        eval_metric=args.eval_metric,
-        stopping_metric=args.stopping_metric,
-        auto_stack=args.auto_stack, # default: False
-        hyperparameter_tune=args.hyperparameter_tune, # default: False
-        feature_prune=args.feature_prune, # default: False
-        holdout_frac=args.holdout_frac, # default: None
-        num_bagging_folds=args.num_bagging_folds, # default: 0
-        num_bagging_sets=args.num_bagging_sets, # default: None
-        stack_ensemble_levels=args.stack_ensemble_levels, # default: 0
-        hyperparameters=args.hyperparameters,
-        cache_data=args.cache_data,
-        time_limits=args.time_limits,
-        num_trials=args.num_trials, # default: None
-        search_strategy=args.search_strategy, # default: 'random'
-        search_options=args.search_options,
-        visualizer=args.visualizer,
-        verbosity=args.verbosity
+        **args.fit_args,
     )
     
     # Results summary
     predictor.fit_summary(verbosity=1)
 
-    # Leaderboard on optional test data
+    # Optional test data
     if args.test:
         print(f'Test files: {os.listdir(args.test)}')
-        test_data = __load_input_data(args.test)    
-        print('Running model on test data and getting Leaderboard...')
-        leaderboard = predictor.leaderboard(dataset=test_data, silent=True)
-        def format_for_print(df):
-            table = PrettyTable(list(df.columns))
-            for row in df.itertuples():
-                table.add_row(row[1:])
-            return str(table)
-        print(format_for_print(leaderboard), end='\n\n')
+        test_data = __load_input_data(args.test)
+        # Test data must be labeled for scoring
+        if args.fit_args['label'] in test_data:
+            # Leaderboard on test data
+            print('Running model on test data and getting Leaderboard...')
+            leaderboard = predictor.leaderboard(dataset=test_data, silent=True)
+            print(format_for_print(leaderboard), end='\n\n')
+
+            # Feature importance on test data
+            # Note: Feature importance must be calculated on held-out (test) data.
+            # If calculated on training data it will be biased due to overfitting.
+            if args.feature_importance:      
+                print('Feature importance:')
+                # Increase rows to print feature importance                
+                pd.set_option('display.max_rows', 500)
+                print(predictor.feature_importance(test_data))
+        else:
+            warnings.warn('Skipping eval on test data since label column is not included.')
 
     # Files summary
     print(f'Model export summary:')
@@ -132,29 +133,36 @@ def parse_args():
 
 if __name__ == "__main__":
     start = timer()
-
     args = parse_args()
     
-    # Print SageMaker args
-    print('\n====== args ======')
-    for k,v in vars(args).items():
-        print(f'{k},  type: {type(v)},  value: {v}')
-    print()
-    
-    # Convert AutoGluon hyperparameters from strings
-    if args.hyperparameters:
-        for model_type,options in args.hyperparameters.items():
+    # Verify label is included
+    if 'label' not in args.fit_args:
+        raise ValueError('"label" is a required parameter of "fit_args"!')
+
+    # Convert optional fit call hyperparameters from strings
+    if 'hyperparameters' in args.fit_args:
+        for model_type,options in args.fit_args['hyperparameters'].items():
             assert isinstance(options, dict)
             for k,v in options.items():
-                args.hyperparameters[model_type][k] = eval(v)
-        print(f'AutoGluon Hyperparameters: {args.hyperparameters}', end='\n\n')
-    
+                args.fit_args['hyperparameters'][model_type][k] = eval(v) 
+ 
+    # Print SageMaker args
+    print('fit_args:')
+    for k,v in args.fit_args.items():
+        print(f'{k},  type: {type(v)},  value: {v}')
+        
+    # Make test data optional
+    if os.environ.get('SM_CHANNEL_TESTING'):
+        args.test = os.environ['SM_CHANNEL_TESTING']
+    else:
+        args.test = None
+
     train(args)
 
     # Package inference code with model export
     subprocess.call('mkdir /opt/ml/model/code'.split())
     subprocess.call('cp /opt/ml/code/inference.py /opt/ml/model/code/'.split())
-    
+    subprocess.call('cp columns.pkl /opt/ml/model/code/'.split())
+
     elapsed_time = round(timer()-start,3)
-    print(f'Elapsed time: {elapsed_time} seconds')  
-    print('===== Training Completed =====')
+    print(f'Elapsed time: {elapsed_time} seconds. Training Completed!')
