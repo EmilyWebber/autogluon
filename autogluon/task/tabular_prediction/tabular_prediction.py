@@ -17,7 +17,7 @@ from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learne
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 
-from ...experiments import set_experiment_config
+from ...experiments.sagemaker import set_experiment_config
 
 __all__ = ['TabularPrediction']
 
