@@ -61,7 +61,7 @@ def train(args):
     train_data = __load_input_data(args.train)
     
     # Extract column info
-    target = args.fit_args['label']
+#     target = 'y'
     columns = train_data.columns.tolist()
     column_dict = {"columns":columns}
     with open('columns.pkl', 'wb') as f:
@@ -71,7 +71,8 @@ def train(args):
     predictor = task.fit(
         train_data=train_data,
         output_directory=args.model_dir,
-        **args.fit_args,
+        label='y'
+#         **args.fit_args,
     )
     
     # Results summary
@@ -127,6 +128,8 @@ def parse_args():
                         help='https://autogluon.mxnet.io/api/autogluon.task.html#tabularprediction')
     # Additional options
     parser.add_argument('--feature_importance', type='bool', default=True)
+    
+    parser.add_argument('--label', type=str, default='y')
 
     return parser.parse_args()
 
@@ -135,21 +138,17 @@ if __name__ == "__main__":
     start = timer()
     args = parse_args()
     
-    # Verify label is included
-    if 'label' not in args.fit_args:
-        raise ValueError('"label" is a required parameter of "fit_args"!')
-
-    # Convert optional fit call hyperparameters from strings
-    if 'hyperparameters' in args.fit_args:
-        for model_type,options in args.fit_args['hyperparameters'].items():
-            assert isinstance(options, dict)
-            for k,v in options.items():
-                args.fit_args['hyperparameters'][model_type][k] = eval(v) 
+#     # Convert optional fit call hyperparameters from strings
+#     if 'hyperparameters' in args.fit_args:
+#         for model_type,options in args.fit_args['hyperparameters'].items():
+#             assert isinstance(options, dict)
+#             for k,v in options.items():
+#                 args.fit_args['hyperparameters'][model_type][k] = eval(v) 
  
-    # Print SageMaker args
-    print('fit_args:')
-    for k,v in args.fit_args.items():
-        print(f'{k},  type: {type(v)},  value: {v}')
+#     # Print SageMaker args
+#     print('fit_args:')
+#     for k,v in args.fit_args.items():
+#         print(f'{k},  type: {type(v)},  value: {v}')
         
     # Make test data optional
     if os.environ.get('SM_CHANNEL_TESTING'):
