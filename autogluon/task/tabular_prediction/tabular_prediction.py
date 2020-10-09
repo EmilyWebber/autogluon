@@ -17,6 +17,8 @@ from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learne
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 
+from ...experiments import set_experiment_config
+
 __all__ = ['TabularPrediction']
 
 logger = logging.getLogger()  # return root logger
@@ -73,6 +75,8 @@ class TabularPrediction(BaseTask):
             num_trials=None,
             search_strategy='random',
             verbosity=2,
+            integrate_sm_experiments = None,
+            experiment_basename = None,
             **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -449,6 +453,13 @@ class TabularPrediction(BaseTask):
         >>> time_limits = 360  # set as long as you are willing to wait (in sec)
         >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
         """
+        if integrate_sm_experiments:
+            try:
+                experiment_name = set_experiment_config(experiment_basename)
+            except:
+                print ('Something went wrong on your SageMaker experiment configuration. If you want to skip this, just set integrate_sm_experiments to False.')
+                return
+        
         assert search_strategy != 'bayesopt_hyperband', \
             "search_strategy == 'bayesopt_hyperband' not yet supported"
         if verbosity < 0:
