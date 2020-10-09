@@ -1,0 +1,7 @@
+
+autogluon
+PrettyTable
+bokeh
+numpy--1.16.1
+boto3
+matplotlib

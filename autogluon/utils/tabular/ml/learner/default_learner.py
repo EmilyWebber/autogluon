@@ -16,7 +16,6 @@ from ...data.label_cleaner import LabelCleaner
 
 logger = logging.getLogger(__name__)
 
-
 # TODO: Add functionality for advanced feature generators such as gl_code_matrix_generator (inter-row dependencies, apply to train differently than test, etc., can only run after train/test split, rerun for each cv fold)
 # TODO: - Differentiate between advanced generators that require fit (stateful, gl_code_matrix) and those that do not (bucket label averaging in SCOT GC 2019)
 # TODO: - Those that do not could be added to preprocessing function of model, but would then have to be recomputed on each model.
