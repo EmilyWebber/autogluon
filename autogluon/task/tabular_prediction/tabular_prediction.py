@@ -17,12 +17,9 @@ from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learne
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 
-from ...experiments.sagemaker import set_experiment_config
-
 __all__ = ['TabularPrediction']
 
 logger = logging.getLogger()  # return root logger
-
 
 class TabularPrediction(BaseTask):
     """
@@ -455,6 +452,8 @@ class TabularPrediction(BaseTask):
         """
         if integrate_sm_experiments:
             try:
+                # how do we set this import of boto3 and the sagemkaer experiment sdk as optional?
+                from ...experiments.sagemaker import set_experiment_config
                 experiment_name = set_experiment_config(experiment_basename)
             except:
                 print ('Something went wrong on your SageMaker experiment configuration. If you want to skip this, just set integrate_sm_experiments to False.')
@@ -639,9 +638,18 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
-        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
-                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
-                          label_count_threshold=label_count_threshold, random_seed=random_seed)
+        
+        # if we created a valid experiment above, pass it into the base learner here       
+        if len(experiment_name) > 1:
+            learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
+                              id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
+                              label_count_threshold=label_count_threshold, random_seed=random_seed, experiment_name = experiment_name)            
+            
+        else:        
+            learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
+                              id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
+                              label_count_threshold=label_count_threshold, random_seed=random_seed)
+        
         learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,

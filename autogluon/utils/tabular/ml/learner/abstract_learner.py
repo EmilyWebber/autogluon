@@ -38,7 +38,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: PipelineFeatureGenerator, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
+                 problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0, experiment_name = None):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.id_columns = id_columns
@@ -54,6 +54,7 @@ class AbstractLearner:
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
         self.feature_generators = [self.feature_generator]
+        self.experiment_name = experiment_name
 
         self.trainer: AbstractTrainer = None
         self.trainer_type = None
@@ -212,6 +213,15 @@ class AbstractLearner:
             all_trained_models.append('oracle_ensemble')
 
         for model_name, pred_proba in model_pred_proba_dict.items():
+            
+            # if they created an experiment
+            if self.experiment_name != None:
+                try:
+                    from ....experiments.sagemaker import create_trial
+                    trial = create_trial(self.experiment_name, model_name)
+                except:
+                    print ('Could not add model {} to your experiment {}, sorry!'.format(model_name, self.experiment_name))
+            
             if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                 pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)  # FIXME: I think this doesn't work correctly, must use original y as well!
             if trainer.eval_metric_expects_y_pred:
@@ -219,7 +229,7 @@ class AbstractLearner:
                 scores[model_name] = self.eval_metric(y, pred)
             else:
                 scores[model_name] = self.eval_metric(y, pred_proba)
-
+                
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
         for model in model_pred_proba_dict.keys():
