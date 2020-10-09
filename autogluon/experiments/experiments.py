@@ -28,7 +28,8 @@ def set_experiment_config(experiment_basename = None):
         Experiment.create(experiment_name=experiment_name, 
                             description="Running AutoGluon Tabular with SageMaker Experiments", 
                             sagemaker_boto_client=client)
+        print ('Created an experiment named {}, you should be able to see this in SageMaker Studio right now.'.format(experiment_name))
     except:
-        print ('Could not create the experiment. Is your basename properly configured?')
+        print ('Could not create the experiment. Is your basename properly configured? Also try installing the sagemaker experiments SDK with pip install sagemaker-experiments.')
     
     return experiment_name
