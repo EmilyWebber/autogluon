@@ -1,7 +1,9 @@
-# git+git://github.com/EmilyWebber/autogluon.git
-autogluon
+git+git://github.com/EmilyWebber/autogluon.git
+# autogluon
 PrettyTable
 bokeh
 numpy==1.16.1
 boto3
 matplotlib
+sagemaker
+sagemaker-experiments
